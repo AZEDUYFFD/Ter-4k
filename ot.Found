@@ -1,7 +1,7 @@
 #EXTM3U
 ########### beIN SPORTS 576P ###########
 #EXTINF:-1 tvg-logo="http://91.208.162.66/bsnew/bs1hd.png" group-title="beIN SPORTS 576P",beIN SPORTS 1 576P
-http://auziatv.com:8080/TERH/06998941/85867
+https://py.dencreak.com/bn_u_576P_1.m3u8
 # --- مجموعة beIN SPORTS HEVC ---
 #EXTINF:-1 tvg-name="beIN Sports 1 Hevc" group-title="beIN HEVC",AR: beIN Sports 1 Hevc
 http://auziatv.com:8080/TERH/06998941/5348
