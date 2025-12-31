@@ -3,18 +3,7 @@
 ########### beIN SPORTS 576P ###########
 #EXTINF:-1 tvg-logo="http://91.208.162.66/bsnew/bs1hd.png" group-title="beIN SPORTS 576P",beIN SPORTS 1 576P
 http://auziatv.com:8080/TERH/06998941/85867
-#EXTINF:-1 tvg-name="BEIN SPORTS MAX 1 HD" group-title="beIN SPORTS MAX",AR: BEIN SPORTS MAX 1 HD
-http://auziatv.com:8080/TERH/06998941/85866
-#EXTINF:-1 tvg-name="BEIN SPORTS MAX 1 SD" group-title="beIN SPORTS MAX",AR: BEIN SPORTS MAX 1 SD
-http://auziatv.com:8080/TERH/06998941/85865
-#EXTINF:-1 tvg-name="BEIN SPORTS MAX 2 FHD" group-title="beIN SPORTS MAX",AR: BEIN SPORTS MAX 2 FHD
-http://auziatv.com:8080/TERH/06998941/85870
-#EXTINF:-1 tvg-name="BEIN SPORTS MAX 2 HD" group-title="beIN SPORTS MAX",AR: BEIN SPORTS MAX 2 HD
-http://auziatv.com:8080/TERH/06998941/85869
-#EXTINF:-1 tvg-name="BEIN SPORTS MAX 3 FHD" group-title="beIN SPORTS MAX",AR: BEIN SPORTS MAX 3 FHD
-http://auziatv.com:8080/TERH/06998941/85873
-#EXTINF:-1 tvg-name="BEIN SPORTS MAX 4 FHD" group-title="beIN SPORTS MAX",AR: BEIN SPORTS MAX 4 FHD
-http://auziatv.com:8080/TERH/06998941/85876
+
 
 # --- مجموعة beIN SPORTS HEVC ---
 #EXTINF:-1 tvg-name="beIN Sports 1 Hevc" group-title="beIN HEVC",AR: beIN Sports 1 Hevc
