@@ -1,10 +1,7 @@
 #EXTM3U
-
 ########### beIN SPORTS 576P ###########
 #EXTINF:-1 tvg-logo="http://91.208.162.66/bsnew/bs1hd.png" group-title="beIN SPORTS 576P",beIN SPORTS 1 576P
 http://auziatv.com:8080/TERH/06998941/85867
-
-
 # --- مجموعة beIN SPORTS HEVC ---
 #EXTINF:-1 tvg-name="beIN Sports 1 Hevc" group-title="beIN HEVC",AR: beIN Sports 1 Hevc
 http://auziatv.com:8080/TERH/06998941/5348
@@ -16,7 +13,6 @@ http://auziatv.com:8080/TERH/06998941/5350
 http://auziatv.com:8080/TERH/06998941/5351
 #EXTINF:-1 tvg-name="beIN Sports 5 Hevc" group-title="beIN HEVC",AR: beIN Sports 5 Hevc
 http://auziatv.com:8080/TERH/06998941/5352
-
 # --- مجموعة beIN SPORTS FHD ---
 #EXTINF:-1 tvg-name="beIN SPORTS 1 FHD" group-title="beIN FHD",AR: beIN SPORTS 1 FHD
 http://auziatv.com:8080/TERH/06998941/110243
@@ -25,22 +21,4 @@ http://auziatv.com:8080/TERH/06998941/110244
 #EXTINF:-1 tvg-name="beIN SPORTS 3 FHD" group-title="beIN FHD",AR: beIN SPORTS 3 FHD
 http://auziatv.com:8080/TERH/06998941/110245
 
-# --- مجموعة beIN SPORTS HD ---
-#EXTINF:-1 tvg-name="beIN SPORTS 1 HD" group-title="beIN HD",AR: beIN SPORTS 1 HD
-http://auziatv.com:8080/TERH/06998941/5359
-#EXTINF:-1 tvg-name="beIN SPORTS 2 HD" group-title="beIN HD",AR: beIN SPORTS 2 HD
-http://auziatv.com:8080/TERH/06998941/5360
-#EXTINF:-1 tvg-name="beIN SPORTS News HD" group-title="beIN HD",beIN SPORTS News HD
-http://auziatv.com:8080/TERH/06998941/47816
 
-# --- مجموعة beIN SPORTS AFC ---
-#EXTINF:-1 tvg-name="beIN SPORTS AFC HD" group-title="beIN AFC",AR: beIN SPORTS AFC HD
-http://auziatv.com:8080/TERH/06998941/85638
-#EXTINF:-1 tvg-name="beIN SPORTS AFC 1 HD" group-title="beIN AFC",AR: beIN SPORTS AFC 1 HD
-http://auziatv.com:8080/TERH/06998941/85639
-
-# --- القنوات الأجنبية (TR & FR) ---
-#EXTINF:-1 tvg-name="beIN SPORTS 2 HD TR" group-title="beIN TR",TR: BEIN SPORTS 2 HD
-http://auziatv.com:8080/TERH/06998941/58830
-#EXTINF:-1 tvg-name="beIN Sports 1 FR" group-title="beIN FR",AR: beIN Sports 1 FR
-http://auziatv.com:8080/TERH/06998941/77519
