@@ -1,7 +1,7 @@
 #EXTM3U
 
-# --- مجموعة beIN SPORTS MAX ---
-#EXTINF:-1 tvg-name="BEIN SPORTS MAX 1 FHD" group-title="beIN SPORTS MAX",AR: BEIN SPORTS MAX 1 FHD
+########### beIN SPORTS 576P ###########
+#EXTINF:-1 tvg-logo="http://91.208.162.66/bsnew/bs1hd.png" group-title="beIN SPORTS 576P",beIN SPORTS 1 576P
 http://auziatv.com:8080/TERH/06998941/85867
 #EXTINF:-1 tvg-name="BEIN SPORTS MAX 1 HD" group-title="beIN SPORTS MAX",AR: BEIN SPORTS MAX 1 HD
 http://auziatv.com:8080/TERH/06998941/85866
