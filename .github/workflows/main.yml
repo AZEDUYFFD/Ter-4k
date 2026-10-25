@@ -1,0 +1,152 @@
+
+name: Public Streaming Server (GitHub Actions)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  streaming-vps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Install packages and SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y openssh-server curl jq
+          sudo systemctl enable --now ssh
+
+      - name: Configure SSH with public key only
+        shell: bash
+        env:
+          VPS_SSH_PUBLIC_KEY: ${{ secrets.VPS_SSH_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VPS_SSH_PUBLIC_KEY}" ]; then
+            echo "::error::Add VPS_SSH_PUBLIC_KEY to GitHub Actions Secrets."
+            exit 1
+          fi
+
+          sudo install -d -m 700 /root/.ssh
+          printf '%s\n' "$VPS_SSH_PUBLIC_KEY" | sudo tee /root/.ssh/authorized_keys >/dev/null
+          sudo chmod 600 /root/.ssh/authorized_keys
+
+          sudo sed -i \
+            -e 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' \
+            -e 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' \
+            -e 's/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/' \
+            /etc/ssh/sshd_config
+          sudo sshd -t
+          sudo systemctl restart ssh
+
+      - name: Install and connect Tailscale
+        shell: bash
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAILSCALE_AUTH_KEY}" ]; then
+            echo "::error::Add TAILSCALE_AUTH_KEY to GitHub Actions Secrets."
+            exit 1
+          fi
+
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up \
+            --authkey="${TAILSCALE_AUTH_KEY}" \
+            --hostname="stream-vps-${GITHUB_RUN_ID}"
+
+          TS_IP="$(tailscale ip -4 | head -n 1)"
+          if [ -z "$TS_IP" ]; then
+            echo "::error::Could not obtain Tailscale IPv4 address."
+            exit 1
+          fi
+          echo "TAILSCALE_IP=$TS_IP" >> "$GITHUB_ENV"
+
+      - name: Install MediaMTX
+        shell: bash
+        run: |
+          set -euo pipefail
+          API_JSON="$(curl -fsSL https://api.github.com/repos/bluenviron/mediamtx/releases/latest)"
+          ASSET_URL="$(printf '%s' "$API_JSON" | jq -r \
+            '.assets[] | select(.name | test("linux_amd64\\.tar\\.gz$")) | .browser_download_url' \
+            | head -n 1)"
+
+          if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
+            echo "::error::Could not find a MediaMTX Linux AMD64 release."
+            exit 1
+          fi
+
+          curl -fsSL "$ASSET_URL" -o /tmp/mediamtx.tar.gz
+          mkdir -p /tmp/mediamtx
+          tar -xzf /tmp/mediamtx.tar.gz -C /tmp/mediamtx
+          MEDIAMTX_BIN="$(find /tmp/mediamtx -maxdepth 1 -type f -name mediamtx | head -n 1)"
+          test -n "$MEDIAMTX_BIN"
+          sudo install -m 755 "$MEDIAMTX_BIN" /usr/local/bin/mediamtx
+
+          sudo tee /etc/mediamtx.yml >/dev/null <<'EOF'
+          logLevel: info
+          logDestinations: [stdout]
+          rtsp: false
+          rtmp: true
+          rtmpAddress: :1935
+          hls: true
+          hlsAddress: :8888
+          hlsEncryption: false
+          hlsAllowOrigins: ["*"]
+          hlsVariant: mpegts
+          hlsSegmentCount: 7
+          hlsSegmentDuration: 2s
+          webrtc: false
+          srt: false
+          paths:
+            all_others:
+              source: publisher
+          EOF
+
+          sudo tee /etc/systemd/system/mediamtx.service >/dev/null <<'EOF'
+          [Unit]
+          Description=MediaMTX live streaming server
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/mediamtx /etc/mediamtx.yml
+          Restart=always
+          RestartSec=3
+          LimitNOFILE=65536
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now mediamtx
+          sudo systemctl --no-pager --full status mediamtx
+
+      - name: Print connection details
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Temporary test server is ready."
+          echo "Tailscale IP: ${TAILSCALE_IP}"
+          echo "OBS server URL: rtmp://${TAILSCALE_IP}:1935/live"
+          echo "OBS stream key/path: stream"
+          echo "HLS URL (Tailscale network only): http://${TAILSCALE_IP}:8888/live/stream/index.m3u8"
+          echo "This is NOT a public internet endpoint."
+          echo "GitHub-hosted runner jobs stop after at most 6 hours."
+
+      - name: Keep service running for the permitted job duration
+        shell: bash
+        run: |
+          set -euo pipefail
+          while true; do
+            echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] MediaMTX status:"
+            sudo systemctl is-active mediamtx || true
+            sleep 300
+          done
