@@ -1,5 +1,5 @@
 
-name: Public Streaming Server (GitHub Actions)
+name: Temporary Public MediaMTX Stream
 
 on:
   workflow_dispatch:
@@ -8,145 +8,131 @@ permissions:
   contents: read
 
 jobs:
-  streaming-vps:
+  stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 350
 
     steps:
-      - name: Install packages and SSH
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Install tools
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
           sudo apt-get update
-          sudo apt-get install -y openssh-server curl jq
-          sudo systemctl enable --now ssh
+          sudo apt-get install -y curl jq
 
-      - name: Configure SSH with public key only
-        shell: bash
-        env:
-          VPS_SSH_PUBLIC_KEY: ${{ secrets.VPS_SSH_PUBLIC_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -z "${VPS_SSH_PUBLIC_KEY}" ]; then
-            echo "::error::Add VPS_SSH_PUBLIC_KEY to GitHub Actions Secrets."
-            exit 1
-          fi
+          # Download the latest MediaMTX Linux AMD64 release
+          URL=$(curl -fsSL \
+            https://api.github.com/repos/bluenviron/mediamtx/releases/latest \
+            | jq -r '.assets[] |
+              select(.name | test("linux_amd64\\.tar\\.gz$")) |
+              .browser_download_url' | head -n 1)
 
-          sudo install -d -m 700 /root/.ssh
-          printf '%s\n' "$VPS_SSH_PUBLIC_KEY" | sudo tee /root/.ssh/authorized_keys >/dev/null
-          sudo chmod 600 /root/.ssh/authorized_keys
+          test -n "$URL"
+          curl -fsSL "$URL" -o /tmp/mediamtx.tar.gz
+          mkdir -p "$HOME/mediamtx"
+          tar -xzf /tmp/mediamtx.tar.gz -C "$HOME/mediamtx"
+          sudo install "$HOME/mediamtx/mediamtx" /usr/local/bin/mediamtx
 
-          sudo sed -i \
-            -e 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' \
-            -e 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' \
-            -e 's/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/' \
-            /etc/ssh/sshd_config
-          sudo sshd -t
-          sudo systemctl restart ssh
+          # Install cloudflared
+          curl -fsSL \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+            -o /tmp/cloudflared
+          chmod +x /tmp/cloudflared
+          sudo install /tmp/cloudflared /usr/local/bin/cloudflared
 
-      - name: Install and connect Tailscale
-        shell: bash
-        env:
-          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -z "${TAILSCALE_AUTH_KEY}" ]; then
-            echo "::error::Add TAILSCALE_AUTH_KEY to GitHub Actions Secrets."
-            exit 1
-          fi
-
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up \
-            --authkey="${TAILSCALE_AUTH_KEY}" \
-            --hostname="stream-vps-${GITHUB_RUN_ID}"
-
-          TS_IP="$(tailscale ip -4 | head -n 1)"
-          if [ -z "$TS_IP" ]; then
-            echo "::error::Could not obtain Tailscale IPv4 address."
-            exit 1
-          fi
-          echo "TAILSCALE_IP=$TS_IP" >> "$GITHUB_ENV"
-
-      - name: Install MediaMTX
+      - name: Configure MediaMTX
         shell: bash
         run: |
-          set -euo pipefail
-          API_JSON="$(curl -fsSL https://api.github.com/repos/bluenviron/mediamtx/releases/latest)"
-          ASSET_URL="$(printf '%s' "$API_JSON" | jq -r \
-            '.assets[] | select(.name | test("linux_amd64\\.tar\\.gz$")) | .browser_download_url' \
-            | head -n 1)"
-
-          if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
-            echo "::error::Could not find a MediaMTX Linux AMD64 release."
-            exit 1
-          fi
-
-          curl -fsSL "$ASSET_URL" -o /tmp/mediamtx.tar.gz
-          mkdir -p /tmp/mediamtx
-          tar -xzf /tmp/mediamtx.tar.gz -C /tmp/mediamtx
-          MEDIAMTX_BIN="$(find /tmp/mediamtx -maxdepth 1 -type f -name mediamtx | head -n 1)"
-          test -n "$MEDIAMTX_BIN"
-          sudo install -m 755 "$MEDIAMTX_BIN" /usr/local/bin/mediamtx
-
-          sudo tee /etc/mediamtx.yml >/dev/null <<'EOF'
+          cat > mediamtx.yml <<'EOF'
           logLevel: info
-          logDestinations: [stdout]
-          rtsp: false
-          rtmp: true
+
+          rtmp: yes
           rtmpAddress: :1935
-          hls: true
-          hlsAddress: :8888
-          hlsEncryption: false
-          hlsAllowOrigins: ["*"]
-          hlsVariant: mpegts
-          hlsSegmentCount: 7
-          hlsSegmentDuration: 2s
-          webrtc: false
-          srt: false
+
+          hls: yes
+          hlsAddress: 127.0.0.1:8888
+
+          webrtc: no
+          srt: no
+
+          authMethod: internal
+          authInternalUsers:
+            - user: any
+              pass:
+              ips: []
+              permissions:
+                - action: publish
+                  path: stream
+            - user: any
+              pass:
+              ips: []
+              permissions:
+                - action: read
+                  path: stream
+
           paths:
-            all_others:
+            stream:
               source: publisher
           EOF
 
-          sudo tee /etc/systemd/system/mediamtx.service >/dev/null <<'EOF'
-          [Unit]
-          Description=MediaMTX live streaming server
-          After=network-online.target
-          Wants=network-online.target
-
-          [Service]
-          Type=simple
-          ExecStart=/usr/local/bin/mediamtx /etc/mediamtx.yml
-          Restart=always
-          RestartSec=3
-          LimitNOFILE=65536
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-
-          sudo systemctl daemon-reload
-          sudo systemctl enable --now mediamtx
-          sudo systemctl --no-pager --full status mediamtx
-
-      - name: Print connection details
+      - name: Start MediaMTX
         shell: bash
         run: |
-          set -euo pipefail
-          echo "Temporary test server is ready."
-          echo "Tailscale IP: ${TAILSCALE_IP}"
-          echo "OBS server URL: rtmp://${TAILSCALE_IP}:1935/live"
-          echo "OBS stream key/path: stream"
-          echo "HLS URL (Tailscale network only): http://${TAILSCALE_IP}:8888/live/stream/index.m3u8"
-          echo "This is NOT a public internet endpoint."
-          echo "GitHub-hosted runner jobs stop after at most 6 hours."
+          nohup mediamtx mediamtx.yml > mediamtx.log 2>&1 &
+          echo $! > mediamtx.pid
+          sleep 3
+          cat mediamtx.log
+          curl --retry 10 --retry-delay 2 --retry-connrefused \
+            -fsS http://127.0.0.1:8888/ >/dev/null || true
 
-      - name: Keep service running for the permitted job duration
+      - name: Start public HTTPS tunnel
         shell: bash
         run: |
-          set -euo pipefail
-          while true; do
-            echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] MediaMTX status:"
-            sudo systemctl is-active mediamtx || true
-            sleep 300
+          cloudflared tunnel \
+            --no-autoupdate \
+            --url http://127.0.0.1:8888 \
+            > cloudflared.log 2>&1 &
+          echo $! > cloudflared.pid
+
+          for i in $(seq 1 30); do
+            URL=$(grep -Eo \
+              'https://[a-zA-Z0-9-]+\.trycloudflare\.com' \
+              cloudflared.log | head -n 1 || true)
+            if [ -n "$URL" ]; then
+              echo "Temporary public URL: $URL"
+              break
+            fi
+            sleep 2
           done
+
+          cat cloudflared.log
+
+      - name: Keep services running and show logs
+        shell: bash
+        run: |
+          echo "OBS publishes to the runner's Tailscale IP on port 1935."
+          echo "HLS path: /stream/index.m3u8"
+          while true; do
+            if ! kill -0 "$(cat mediamtx.pid)" 2>/dev/null; then
+              echo "MediaMTX stopped"
+              cat mediamtx.log
+              exit 1
+            fi
+            if ! kill -0 "$(cat cloudflared.pid)" 2>/dev/null; then
+              echo "Cloudflare tunnel stopped"
+              cat cloudflared.log
+              exit 1
+            fi
+            sleep 15
+          done
+
+      - name: Print logs on failure
+        if: failure()
+        run: |
+          cat mediamtx.log 2>/dev/null || true
+          cat cloudflared.log 2>/dev/null || true
